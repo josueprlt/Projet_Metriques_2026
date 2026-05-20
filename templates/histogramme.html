@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Températures Paris — Google LineChart</title>
+    <title>Températures Paris — Google HistoChart</title>
 
     <script src="https://www.gstatic.com/charts/loader.js"></script>
 
@@ -62,51 +62,36 @@
             const json = await res.json();
 
             // json attendu: [{ datetime: "2026-02-15T00:00", temperature_c: 0.5 }, ...]
-            // Convertir en rows: [Date, Number]
-            const rows = json.map(p => {
-                const dt = toDate(p.datetime);
-                const temp = Number(p.temperature_c);
-                return [dt, temp];
-            });
-
-            // Optionnel: trier par date au cas où
-            rows.sort((a, b) => a[0] - b[0]);
-
+            // Retourner uniquement les températures pour l’histogramme.
+            const rows = json.map(p => [Number(p.temperature_c)]).filter(r => Number.isFinite(r[0]));
             return rows;
-        }
-
-        function toDate(isoLike) {
-            // "2026-02-15T00:00"
-            // On parse en Date locale. Si tu veux forcer UTC, dis-moi.
-            const [datePart, timePart] = isoLike.split('T');
-            const [y, m, d] = datePart.split('-').map(Number);
-            const [hh, mm] = timePart.split(':').map(Number);
-            return new Date(y, m - 1, d, hh, mm, 0);
         }
 
         function drawChart(rows) {
             const data = new google.visualization.DataTable();
-            data.addColumn('datetime', 'Date/Heure');
             data.addColumn('number', 'Température (°C)');
             data.addRows(rows);
 
             const options = {
-                title: 'Température à Paris (horaire)',
-                legend: { position: 'bottom' },
+                title: 'Distribution des températures horaires à Paris',
+                legend: { position: 'none' },
                 hAxis: {
-                    title: 'Date/Heure',
-                    format: 'dd/MM HH:mm'
+                    title: 'Température (°C)'
                 },
                 vAxis: {
-                    title: '°C'
+                    title: 'Nombre d’heures'
                 },
-                explorer: { actions: ['dragToZoom', 'rightClickToReset'] }
+                histogram: {
+                    bucketSize: 1,
+                    lastBucketPercentile: 5,
+                    showItemDividers: false
+                }
             };
 
-            const chart = new google.visualization.LineChart(document.getElementById('chart'));
+            const chart = new google.visualization.Histogram(document.getElementById('chart'));
             chart.draw(data, options);
 
-            showStatus(`OK — ${rows.length} points chargés depuis /paris`);
+            showStatus(`OK — ${rows.length} températures chargées depuis /paris`);
         }
 
         function showStatus(msg) {
