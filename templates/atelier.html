@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Répartition des Températures — Pie Chart</title>
+
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+
+<style>
+    #chart {
+        width: 100%;
+        height: 400px;
+    }
+</style>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Répartition des Températures à Paris</h1>
+            <p>Distribution des catégories thermiques horaires</p>
+        </div>
+
+        <div class="content">
+            <div id="chart"></div>
+            <div id="status"></div>
+        </div>
+    </div>
+
+    <script>
+        google.charts.load('current', { packages: ['corechart'] });
+        google.charts.setOnLoadCallback(init);
+
+        async function init() {
+            try {
+                const rows = await fetchParisData();
+                drawChart(rows);
+            } catch (err) {
+                showStatus("Erreur: " + (err?.message || err));
+                console.error(err);
+            }
+        }
+
+        async function fetchParisData() {
+            const res = await fetch('/paris', { headers: { 'Accept': 'application/json' } });
+
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status} sur /paris`);
+            }
+
+            const json = await res.json();
+
+            // Catégoriser les températures
+            let cold = 0;     // <= 10°C
+            let mild = 0;     // 11-20°C
+            let warm = 0;     // > 20°C
+
+            json.forEach(p => {
+                const temp = Number(p.temperature_c);
+                if (temp <= 10) {
+                    cold++;
+                } else if (temp <= 20) {
+                    mild++;
+                } else {
+                    warm++;
+                }
+            });
+
+            return [
+                ['Catégorie', 'Nombre d\'heures'],
+                ['🥶 Froid (≤10°C)', cold],
+                ['🌤️ Tiède (11-20°C)', mild],
+                ['☀️ Chaud (>20°C)', warm]
+            ];
+        }
+
+        function drawChart(rows) {
+            const data = google.visualization.arrayToDataTable(rows);
+
+            const options = {
+                title: 'Distribution des catégories thermiques',
+                pieHole: 0.4,
+                colors: ['#4285f4', '#fbbc04', '#ea4335'],
+                legend: {
+                    position: 'bottom',
+                    textStyle: { fontSize: 12 }
+                },
+                tooltip: {
+                    textStyle: { fontSize: 12 }
+                },
+                chartArea: {
+                    width: '100%',
+                    height: '80%'
+                }
+            };
+
+            const chart = new google.visualization.PieChart(document.getElementById('chart'));
+            chart.draw(data, options);
+
+            // Calcul des statistiques
+            const totalHours = rows.slice(1).reduce((sum, row) => sum + row[1], 0);
+            const coldPercent = ((rows[1][1] / totalHours) * 100).toFixed(1);
+            const mildPercent = ((rows[2][1] / totalHours) * 100).toFixed(1);
+            const warmPercent = ((rows[3][1] / totalHours) * 100).toFixed(1);
+
+            showStatus(`✅ OK — ${totalHours} heures analysées | Froid: ${coldPercent}% | Tiède: ${mildPercent}% | Chaud: ${warmPercent}%`);
+
+            // Redraw on resize
+            window.addEventListener('resize', () => {
+                chart.draw(data, options);
+            });
+        }
+
+        function showStatus(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+    </script>
+</body>
+
+</html>
